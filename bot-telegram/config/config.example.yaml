@@ -1,0 +1,14 @@
+mqtt:
+  host: "mqtt.dis.eafit.edu.co"
+  port: 1883
+  username: "admin"
+  password: "semillero"
+  topic: "ops-beacon/events"
+
+telegram:
+  bot_token: "000000000:REPLACE_ME"
+  chat_id: "-1001234567890"
+
+app:
+  host: 0.0.0.0
+  port: 8000

@@ -1,0 +1,9 @@
+services:
+  bot-telegram:
+    build: ./bot-telegram
+    ports:
+      - "8000:8000"
+    environment:
+      CONFIG_PATH: /app/config/config.yaml
+    volumes:
+      - ./bot-telegram/config/config.yaml:/app/config/config.yaml:ro
