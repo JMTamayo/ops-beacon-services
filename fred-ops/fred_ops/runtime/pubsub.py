@@ -4,10 +4,10 @@ import json
 import logging
 from typing import Callable
 
-import aiomqtt
 from pydantic import BaseModel, ValidationError
 
 from fred_ops.config import FredOpsConfig
+from fred_ops.runtime.broker import connect_broker
 
 logger = logging.getLogger(__name__)
 
@@ -18,15 +18,8 @@ async def run_pubsub(
     InputModel: type[BaseModel],
     OutputModel: type[BaseModel],
 ) -> None:
-    broker = config.broker
-    async with aiomqtt.Client(
-        hostname=broker.host,
-        port=broker.port,
-        username=broker.username,
-        password=broker.password,
-        identifier=broker.client_id,
-        protocol_version=aiomqtt.ProtocolVersion.V311,
-    ) as client:
+    client = await connect_broker(config.broker)
+    async with client:
         await client.subscribe(config.input.topic)
         async for message in client.messages:
             try:
