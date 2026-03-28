@@ -14,16 +14,18 @@ logger = logging.getLogger(__name__)
 
 async def connect_broker(config: BrokerConfig) -> aiomqtt.Client:
     """
-    Connect to MQTT broker with comprehensive logging.
+    Create MQTT client with connection verification and logging.
 
-    Logs broker configuration before attempting connection, success with timing,
-    and detailed errors if connection fails. Fails fast on error (no retries).
+    Logs broker configuration before attempting, success with timing,
+    and detailed errors if connection fails. Fails fast on error.
+
+    The returned client is ready for use with async context manager.
 
     Args:
         config: BrokerConfig with host, port, username, password, client_id
 
     Returns:
-        Connected aiomqtt.Client instance
+        Verified aiomqtt.Client instance ready for use with async with
 
     Raises:
         Propagates connection exceptions from aiomqtt
@@ -38,8 +40,8 @@ async def connect_broker(config: BrokerConfig) -> aiomqtt.Client:
     start_time = time.perf_counter()
 
     try:
-        # Create MQTT client with connection parameters
-        client = aiomqtt.Client(
+        # Verify connection by entering context with test client
+        test_client = aiomqtt.Client(
             hostname=config.host,
             port=config.port,
             username=config.username,
@@ -48,8 +50,8 @@ async def connect_broker(config: BrokerConfig) -> aiomqtt.Client:
             protocol_version=aiomqtt.ProtocolVersion.V311,
         )
 
-        # Enter async context to establish connection
-        await client.__aenter__()
+        async with test_client:
+            pass  # Connection successful, exit cleanly
 
         # Log successful connection with timing
         duration = time.perf_counter() - start_time
@@ -57,7 +59,15 @@ async def connect_broker(config: BrokerConfig) -> aiomqtt.Client:
             f"✓ Conexión al Broker MQTT establecida (duración: {duration:.2f}s)"
         )
 
-        return client
+        # Return a new client for the caller to use with async with
+        return aiomqtt.Client(
+            hostname=config.host,
+            port=config.port,
+            username=config.username,
+            password=config.password,
+            identifier=config.client_id,
+            protocol_version=aiomqtt.ProtocolVersion.V311,
+        )
 
     except Exception as e:
         # Log error with context and re-raise (fail fast)

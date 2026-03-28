@@ -18,14 +18,24 @@ async def test_connect_broker_success():
 
     # Mock aiomqtt.Client to avoid actual connection
     with patch("fred_ops.runtime.broker.aiomqtt.Client") as mock_client_class:
-        mock_client = AsyncMock()
-        mock_client_class.return_value = mock_client
+        # Create separate instances for test_client and returned client
+        test_client = AsyncMock()
+        return_client = AsyncMock()
+        mock_client_class.side_effect = [test_client, return_client]
 
         result = await connect_broker(broker_config)
 
         # Verify the client was created with correct parameters
-        mock_client_class.assert_called_once()
-        assert result == mock_client
+        assert mock_client_class.call_count == 2  # Called twice: once for test, once for return
+
+        # Verify that the test client was properly used with async with
+        # __aenter__ and __aexit__ should have been called on the test client
+        test_client.__aenter__.assert_called_once()
+        test_client.__aexit__.assert_called_once()
+
+        # The returned client is a different instance (second call)
+        assert result is return_client
+        assert result is not test_client
 
 
 @pytest.mark.asyncio
@@ -81,6 +91,9 @@ async def test_connect_broker_logs_success():
                 success_logs = [call for call in mock_logger.info.call_args_list
                                if "Conexión" in str(call) or "establecida" in str(call)]
                 assert len(success_logs) > 0
+                # Verify that the success log contains the duration
+                success_msg = success_logs[0][0][0]
+                assert "0.24" in success_msg
 
 
 @pytest.mark.asyncio
