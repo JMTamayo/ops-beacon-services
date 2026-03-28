@@ -1,0 +1,14 @@
+broker:
+  host: localhost
+  port: 1883
+
+mode: sub
+
+input:
+  topic: sensors/raw
+  schema:
+    device_id: str
+    temperature: float
+
+kwargs:
+  log_level: info
