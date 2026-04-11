@@ -13,6 +13,12 @@ dependencies = [
 [project.scripts]
 fred-ops = "fred_ops.cli:main"
 
+[project.optional-dependencies]
+dashboard = [
+    "streamlit>=1.33.0",
+    "pandas>=2.0.0",
+]
+
 [dependency-groups]
 dev = [
     "pytest>=8.0",

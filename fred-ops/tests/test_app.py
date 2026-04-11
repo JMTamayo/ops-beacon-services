@@ -45,6 +45,47 @@ def test_registering_twice_raises():
             pass
 
 
+def test_storage_decorator_stores_function():
+    app = FredOps()
+
+    @app.execute
+    async def my_execute():
+        pass
+
+    @app.storage
+    async def my_storage():
+        pass
+
+    assert app.get_storage() is my_storage
+
+
+def test_get_storage_returns_none_when_not_registered():
+    app = FredOps()
+
+    @app.execute
+    async def my_execute():
+        pass
+
+    assert app.get_storage() is None
+
+
+def test_registering_storage_twice_raises():
+    app = FredOps()
+
+    @app.execute
+    async def my_execute():
+        pass
+
+    @app.storage
+    async def storage1():
+        pass
+
+    with pytest.raises(RuntimeError, match="storage function already registered"):
+        @app.storage
+        async def storage2():
+            pass
+
+
 def test_discover_fred_ops_instance_from_script(tmp_path):
     script = tmp_path / "processor.py"
     script.write_text(textwrap.dedent("""

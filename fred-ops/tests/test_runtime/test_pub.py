@@ -35,7 +35,7 @@ async def test_run_pub_calls_execute_with_output_class():
     mock_client.__aenter__ = AsyncMock(return_value=mock_client)
     mock_client.__aexit__ = AsyncMock(return_value=False)
 
-    with patch("fred_ops.runtime.pub.aiomqtt.Client", return_value=mock_client):
+    with patch("fred_ops.runtime.broker.aiomqtt.Client", return_value=mock_client):
         with pytest.raises(StopAsyncIteration):
             await run_pub(config, execute_fn, OutputModel)
 
@@ -57,7 +57,7 @@ async def test_run_pub_publishes_result():
     mock_client.__aenter__ = AsyncMock(return_value=mock_client)
     mock_client.__aexit__ = AsyncMock(return_value=False)
 
-    with patch("fred_ops.runtime.pub.aiomqtt.Client", return_value=mock_client):
+    with patch("fred_ops.runtime.broker.aiomqtt.Client", return_value=mock_client):
         with pytest.raises(StopAsyncIteration):
             await run_pub(config, execute_fn, OutputModel)
 
@@ -65,6 +65,38 @@ async def test_run_pub_publishes_result():
         "out/topic",
         OutputModel(value=3.14).model_dump_json(),
     )
+
+
+async def test_run_pub_calls_storage_after_publish():
+    config = make_config()
+    sequence: list[str] = []
+    call_count = 0
+
+    async def execute_fn(output, **kwargs):
+        nonlocal call_count
+        call_count += 1
+        if call_count >= 2:
+            raise StopAsyncIteration
+        sequence.append("execute")
+        return output(value=2.0)
+
+    async def storage_fn(result, **kwargs):
+        sequence.append("storage")
+
+    mock_client = AsyncMock()
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=False)
+
+    async def publish_tracked(topic: str, payload: str) -> None:
+        sequence.append("publish")
+
+    mock_client.publish = AsyncMock(side_effect=publish_tracked)
+
+    with patch("fred_ops.runtime.broker.aiomqtt.Client", return_value=mock_client):
+        with pytest.raises(StopAsyncIteration):
+            await run_pub(config, execute_fn, OutputModel, storage_fn)
+
+    assert sequence == ["execute", "publish", "storage"]
 
 
 async def test_run_pub_forwards_kwargs():
@@ -79,7 +111,7 @@ async def test_run_pub_forwards_kwargs():
     mock_client.__aenter__ = AsyncMock(return_value=mock_client)
     mock_client.__aexit__ = AsyncMock(return_value=False)
 
-    with patch("fred_ops.runtime.pub.aiomqtt.Client", return_value=mock_client):
+    with patch("fred_ops.runtime.broker.aiomqtt.Client", return_value=mock_client):
         with pytest.raises(StopAsyncIteration):
             await run_pub(config, execute_fn, OutputModel)
 

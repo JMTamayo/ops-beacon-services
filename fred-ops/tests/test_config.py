@@ -220,3 +220,132 @@ def test_kwargs_empty_when_not_defined(tmp_path):
     path = write_yaml(tmp_path, VALID_PUBSUB_YAML)
     config, _, _ = load_config(path)
     assert config.kwargs == {}
+
+
+GENERIC_SUB_YAML = """
+broker:
+  host: localhost
+  port: 1883
+mode: sub
+input:
+  topic: ops-beacon/#
+  generic_event_log: true
+"""
+
+
+def test_sub_generic_event_log_no_input_model(tmp_path):
+    path = write_yaml(tmp_path, GENERIC_SUB_YAML)
+    config, InputModel, OutputModel = load_config(path)
+    assert config.mode == "sub"
+    assert config.input.generic_event_log is True
+    assert InputModel is None
+    assert OutputModel is None
+
+
+def test_dashboard_omitted_is_none(tmp_path):
+    path = write_yaml(tmp_path, VALID_SUB_YAML)
+    config, _, _ = load_config(path)
+    assert config.dashboard is None
+
+
+def test_dashboard_empty_section_uses_field_defaults(tmp_path):
+    yaml = """
+broker:
+  host: localhost
+  port: 1883
+mode: sub
+input:
+  topic: sensors/raw
+  schema:
+    value: int
+dashboard: {}
+"""
+    path = write_yaml(tmp_path, yaml)
+    config, _, _ = load_config(path)
+    assert config.dashboard is not None
+    assert config.dashboard.enabled is False
+    assert config.dashboard.port == 8501
+
+
+def test_dashboard_partial_keys_use_defaults(tmp_path):
+    yaml = """
+broker:
+  host: localhost
+  port: 1883
+mode: sub
+input:
+  topic: sensors/raw
+  schema:
+    value: int
+dashboard:
+  enabled: true
+  port: 7777
+"""
+    path = write_yaml(tmp_path, yaml)
+    config, _, _ = load_config(path)
+    assert config.dashboard is not None
+    assert config.dashboard.enabled is True
+    assert config.dashboard.port == 7777
+    assert config.dashboard.host == "0.0.0.0"
+    assert config.dashboard.max_rows == 2000
+
+
+def test_dashboard_from_yaml(tmp_path):
+    yaml = """
+broker:
+  host: localhost
+  port: 1883
+mode: sub
+input:
+  topic: sensors/raw
+  schema:
+    value: int
+dashboard:
+  enabled: true
+  port: 9000
+  max_rows: 100
+"""
+    path = write_yaml(tmp_path, yaml)
+    config, _, _ = load_config(path)
+    assert config.dashboard is not None
+    assert config.dashboard.enabled is True
+    assert config.dashboard.port == 9000
+    assert config.dashboard.max_rows == 100
+
+
+def test_dashboard_null_means_disabled(tmp_path):
+    yaml = """
+broker:
+  host: localhost
+  port: 1883
+mode: sub
+input:
+  topic: sensors/raw
+  schema:
+    value: int
+dashboard: null
+"""
+    path = write_yaml(tmp_path, yaml)
+    config, _, _ = load_config(path)
+    assert config.dashboard is None
+
+
+def test_generic_event_log_only_in_sub_mode(tmp_path):
+    yaml = """
+broker:
+  host: localhost
+  port: 1883
+mode: pubsub
+input:
+  topic: in
+  generic_event_log: true
+  schema:
+    a: str
+output:
+  topic: out
+  schema:
+    b: str
+"""
+    path = write_yaml(tmp_path, yaml)
+    with pytest.raises(ConfigError, match="generic_event_log"):
+        load_config(path)
