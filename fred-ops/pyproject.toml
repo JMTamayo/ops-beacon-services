@@ -1,0 +1,27 @@
+[project]
+name = "fred-ops"
+version = "0.1.0"
+description = "MQTT processor framework with CLI"
+requires-python = ">=3.13"
+dependencies = [
+    "aiomqtt>=2.3.0",
+    "click>=8.0.0",
+    "pydantic>=2.0.0",
+    "pyyaml>=6.0",
+]
+
+[project.scripts]
+fred-ops = "fred_ops.cli:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

@@ -1,0 +1,20 @@
+broker:
+  host: localhost
+  port: 1883
+
+mode: pubsub
+
+input:
+  topic: sensors/raw
+  schema:
+    device_id: str
+    temperature: float
+
+output:
+  topic: sensors/processed
+  schema:
+    device_id: str
+    alert: bool
+
+kwargs:
+  threshold: 30.0

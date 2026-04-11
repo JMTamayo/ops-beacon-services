@@ -1,7 +1,7 @@
 COMPOSE := docker compose
 COMPOSE_FILE := docker-compose.yml
 
-.PHONY: help up up-build down down-v build logs logs-bot ps restart stop start pull
+.PHONY: help up up-build down down-v build logs logs-bot ps restart stop start pull run-dth11
 
 .DEFAULT_GOAL := help
 
@@ -20,6 +20,7 @@ help:
 	@echo "  make stop        - Parar sin eliminar contenedores"
 	@echo "  make start       - Arrancar contenedores existentes"
 	@echo "  make pull        - Descargar imágenes base (si aplica)"
+	@echo "  make run-dth11   - Run dth-11 processor (requires MQTT broker at localhost:1883)"
 
 up:
 	$(COMPOSE) -f $(COMPOSE_FILE) up -d
@@ -56,3 +57,6 @@ start:
 
 pull:
 	$(COMPOSE) -f $(COMPOSE_FILE) pull
+
+run-dth11:
+	cd dth-11-processor && uv run --with ../fred-ops fred-ops run --config config.yml --script processor.py

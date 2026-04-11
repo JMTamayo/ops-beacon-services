@@ -1,0 +1,11 @@
+broker:
+  host: localhost
+  port: 1883
+
+mode: pub
+
+output:
+  topic: sensors/heartbeat
+  schema:
+    status: str
+    uptime: int

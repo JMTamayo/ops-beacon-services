@@ -1,0 +1,20 @@
+# DHT11 Temperature and Humidity Sensor Processor
+# Receives sensor readings via MQTT and logs to console
+
+broker:
+  host: sdamqtt.dis.eafit.edu.co    # MQTT broker address
+  port: 1883                        # MQTT standard port
+  username: fred-ops-dth11          # optional
+  password: maxwell                 # optional
+  client_id: fred-ops-dth11         # optional
+
+mode: sub  # Subscriber mode: receive messages only
+
+input:
+  topic: sensor/dth11/#  # MQTT topic where sensor publishes readings
+  schema:
+    valor: float
+    unidad: str
+    timestamp: str
+
+kwargs: {}
