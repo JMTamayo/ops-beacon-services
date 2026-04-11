@@ -1,0 +1,28 @@
+# Copia este archivo a config.yml y ajusta valores (config.yml está en .gitignore).
+# DHT11: MQTT subscriber (fred-ops)
+
+broker:
+  # Solo hostname o IP, sin esquema mqtt://
+  host: your-mqtt-broker.example.com
+  port: 1883
+  username: null
+  password: null
+  client_id: fred-ops-dth11
+
+mode: sub
+
+input:
+  topic: sensor/dth11/#
+  schema:
+    valor: float
+    unidad: str
+    timestamp: str
+
+kwargs: {}
+
+# UI Streamlit (opcional): pon enabled: true y abre http://localhost:8501
+dashboard:
+  enabled: false
+  port: 8501
+  host: "0.0.0.0"
+  max_rows: 2000
