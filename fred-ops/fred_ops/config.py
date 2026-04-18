@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 import yaml
-from pydantic import BaseModel, create_model, model_validator
+from pydantic import BaseModel, Field, create_model, model_validator
 from typing import Any
 
 
@@ -33,6 +33,8 @@ class BrokerConfig(BaseModel):
 class TopicConfig(BaseModel):
     topic: str
     schema_: dict[str, str] = {}
+    # sub mode: skip Pydantic input schema; execute receives mqtt_topic, payload_json, payload_bytes
+    generic_event_log: bool = False
 
     model_config = {"populate_by_name": True}
 
@@ -45,12 +47,29 @@ class TopicConfig(BaseModel):
         return obj
 
 
+class DashboardConfig(BaseModel):
+    """Streamlit UI (only used when a `dashboard:` section exists and `enabled` is true)."""
+
+    enabled: bool = Field(default=False, description="When true, start Streamlit and record events to SQLite.")
+    port: int = Field(default=8501, ge=1, le=65535)
+    host: str = Field(default="0.0.0.0")
+    max_rows: int = Field(default=2000, ge=1)
+    sqlite_path: str | None = Field(
+        default=None,
+        description="SQLite path; default is .fred-ops-dashboard.db in the process working directory.",
+    )
+
+
 class FredOpsConfig(BaseModel):
     broker: BrokerConfig
     mode: str
     input: TopicConfig | None = None
     output: TopicConfig | None = None
     kwargs: dict[str, Any] = {}
+    dashboard: DashboardConfig | None = Field(
+        default=None,
+        description="Omit the `dashboard` key entirely to disable the UI and telemetry sink.",
+    )
 
     @model_validator(mode="after")
     def validate_mode_sections(self) -> "FredOpsConfig":
@@ -67,6 +86,8 @@ class FredOpsConfig(BaseModel):
         elif self.mode == "sub":
             if self.input is None:
                 raise ValueError("sub mode requires an input section")
+        if self.input is not None and self.input.generic_event_log and self.mode != "sub":
+            raise ValueError("generic_event_log is only supported in sub mode")
         return self
 
 
@@ -107,7 +128,10 @@ def load_config(
     OutputModel = None
 
     if config.input is not None:
-        InputModel = _build_model("InputModel", config.input.schema_)
+        if config.input.generic_event_log:
+            InputModel = None
+        else:
+            InputModel = _build_model("InputModel", config.input.schema_)
 
     if config.output is not None:
         OutputModel = _build_model("OutputModel", config.output.schema_)

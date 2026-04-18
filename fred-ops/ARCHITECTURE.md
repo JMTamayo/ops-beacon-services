@@ -171,6 +171,10 @@ class FredOps:
 - Allows the CLI to search for any `FredOps` instance in the module
 - Flexible: you can have multiple services in a monorepo
 
+**Optional `@app.storage`:** Second decorator, at most one function. Invoked after a successful `execute` (signatures differ by mode; see README). `get_storage()` returns `None` if not registered.
+
+**Optional dashboard:** `FredOpsConfig.dashboard` is `None` when the YAML omits `dashboard` or sets `dashboard: null`. When `dashboard.enabled` is true, `cli.py` initializes the SQLite sink (`dashboard/sink.py`), records rows from runtimes (`dashboard/recorder.py`), and spawns `streamlit run` on `dashboard/app.py`. The MQTT process and Streamlit are **separate processes**; data is shared via SQLite (WAL).
+
 ### 2. Config Loader (`config.py`)
 
 Converts YAML into typed Python structures:

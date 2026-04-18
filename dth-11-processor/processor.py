@@ -27,3 +27,14 @@ async def execute(input, **kwargs) -> None:
         f"Timestamp: {input.timestamp}"
     )
     logger.info(message)
+
+
+@app.storage
+async def storage(input, **kwargs) -> None:
+    """
+    Se ejecuta tras un `execute` exitoso. Aquí iría la persistencia (p. ej. INSERT en Postgres).
+
+    En este ejemplo solo registramos el payload serializable; sustituye por tu capa de datos.
+    """
+    payload = input.model_dump()
+    logger.info("[storage] ejemplo de persistencia | payload=%s", payload)
