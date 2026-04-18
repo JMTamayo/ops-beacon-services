@@ -249,7 +249,7 @@ async def execute(input, **kwargs):
     # You can do here:
     # - Save to database
     # - Send email/SMS
-    # - Update dashboard
+    # - Optional: dashboard (Streamlit) and @app.storage — see fred-ops README
     # - Any side effect
 ```
 

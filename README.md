@@ -5,6 +5,7 @@ Monorepo de servicios alrededor de **ops-beacon** (eventos de operación).
 ## Servicios
 
 - **bot-telegram**: notificador MQTT → Telegram. Ver [`bot-telegram/README.md`](bot-telegram/README.md).
+- **dth-11-processor**: procesador MQTT (fred-ops). Ver [`dth-11-processor/README.md`](dth-11-processor/README.md).
 - **portainer**: UI para administrar Docker localmente.
   - versión fijada: `portainer/portainer-ce:2.27.9`.
 

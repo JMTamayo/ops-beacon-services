@@ -1,0 +1,12 @@
+[project]
+name = "dth-11-processor"
+version = "0.1.0"
+description = "MQTT subscriber for DHT11 readings via fred-ops"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "fred-ops[dashboard]",
+]
+
+[tool.uv.sources]
+fred-ops = { path = "../fred-ops", editable = true }

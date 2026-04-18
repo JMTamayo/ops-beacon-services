@@ -1,4 +1,14 @@
 services:
+  dth-11-processor:
+    build:
+      context: .
+      dockerfile: dth-11-processor/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./dth-11-processor/config.yml:/app/dth-11-processor/config.yml:ro
+
   bot-telegram:
     build: ./bot-telegram
     ports:

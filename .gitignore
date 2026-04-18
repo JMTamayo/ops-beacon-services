@@ -97,6 +97,7 @@ celerybeat.pid
 
 # Environments
 .env
+
 .venv
 env/
 venv/
@@ -121,6 +122,11 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# fred-ops dashboard (SQLite WAL)
+.fred-ops-dashboard.db
+.fred-ops-dashboard.db-wal
+.fred-ops-dashboard.db-shm
 
 # IDE
 .vscode/

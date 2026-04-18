@@ -47,7 +47,7 @@ async def connect_broker(config: BrokerConfig) -> aiomqtt.Client:
             username=config.username,
             password=config.password,
             identifier=config.client_id,
-            protocol_version=aiomqtt.ProtocolVersion.V311,
+            protocol=aiomqtt.ProtocolVersion.V311,
         )
 
         async with test_client:
@@ -66,7 +66,7 @@ async def connect_broker(config: BrokerConfig) -> aiomqtt.Client:
             username=config.username,
             password=config.password,
             identifier=config.client_id,
-            protocol_version=aiomqtt.ProtocolVersion.V311,
+            protocol=aiomqtt.ProtocolVersion.V311,
         )
 
     except Exception as e:

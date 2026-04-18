@@ -46,6 +46,8 @@ Everything else is handled by fred-ops.
 - **Three execution modes:** Process messages (PUBSUB), produce messages (PUB), consume messages (SUB)
 - **Type-safe:** Auto-generated Pydantic models from YAML schemas
 - **Async-first:** Built on `aiomqtt` for high-concurrency message processing
+- **Optional persistence hook:** `@app.storage` runs after a successful `execute` (per mode) for DB or audit trails
+- **Optional Streamlit dashboard:** Time series and tables from processed events (SQLite + separate process)
 - **Monorepo-friendly:** Installed as a local package in ops-beacon-services
 
 ---
@@ -66,6 +68,42 @@ uv sync
 ```
 
 This installs fred-ops globally in your environment and makes the `fred-ops` CLI available.
+
+### Optional: Streamlit dashboard
+
+For a live time-series view of processed MQTT payloads (SQLite-backed), install the extra and add a `dashboard` section to YAML:
+
+```bash
+uv pip install -e ".[dashboard]"
+```
+
+- **Omit the `dashboard` key** (or set `dashboard: null`) to disable the UI and avoid starting Streamlit.
+- With a `dashboard` section, **every field is optional**; defaults apply when omitted (`enabled` defaults to `false` until you set it to `true`).
+
+```yaml
+dashboard:
+  enabled: true
+  # port: 8501
+  # host: "0.0.0.0"
+  # max_rows: 2000
+```
+
+Run `fred-ops run ...` as usual; when `enabled: true`, the dashboard process starts alongside the processor. Open `http://localhost:<port>` (default 8501).
+
+Timestamps are shown as human-readable datetimes (default timezone `America/Bogota`; override with env `FRED_OPS_DASHBOARD_TZ`, e.g. `UTC`). The chart uses **Altair** so date labels stay formatted when you expand or zoom the chart; the table shows **numeric and non-numeric** fields from input/output JSON.
+
+### Optional: `@app.storage` (persist after `execute`)
+
+Register **at most one** optional function to persist or audit data **after** `execute` completes without error:
+
+| Mode | Signature (conceptual) |
+|------|-------------------------|
+| `sub` | `async def storage(input, **kwargs)` — same validated `input` as `execute` |
+| `sub` + `generic_event_log` | `async def storage(mqtt_topic=..., payload_json=..., payload_bytes=..., **kwargs)` |
+| `pubsub` | `async def storage(input, result, **kwargs)` — `result` is the output model instance |
+| `pub` | `async def storage(result, **kwargs)` |
+
+If you omit `@app.storage`, nothing is registered. Storage errors are logged and do not stop the MQTT loop (in `pubsub`, publish already happened before storage runs).
 
 ---
 
@@ -288,6 +326,7 @@ async def execute(input, output, **kwargs):
 - Return an instance of `output()` for PUBSUB/PUB modes
 - Return `None` for SUB mode
 - Use `**kwargs` to access config values
+- Optionally add `@app.storage` for persistence after a successful `execute` (see [Installation](#installation))
 
 ### Step 4: Run the service
 
@@ -373,7 +412,29 @@ output:
 kwargs:
   key1: value1
   key2: value2
+
+# Optional: Streamlit dashboard (omit key or use null to disable entirely)
+# dashboard:
+#   enabled: false          # default when section is present but you turn UI off
+#   port: 8501
+#   host: "0.0.0.0"
+#   max_rows: 2000          # SQLite row cap for telemetry
+#   sqlite_path: null       # default: .fred-ops-dashboard.db in cwd
 ```
+
+### Optional: `dashboard`
+
+| Field | Default | Description |
+|-------|---------|-------------|
+| `enabled` | `false` | When `true`, starts a Streamlit process and records events to SQLite for the UI |
+| `port` | `8501` | HTTP port for Streamlit |
+| `host` | `0.0.0.0` | Bind address |
+| `max_rows` | `2000` | Max rows stored in SQLite (rolling window) |
+| `sqlite_path` | *(cwd)* `.fred-ops-dashboard.db` | SQLite database path |
+
+Omit the entire `dashboard` key (or set `dashboard: null`) if you do not want the dashboard or the telemetry file. If a `dashboard` key exists, every field is optional and defaults apply when omitted.
+
+Requires `pip install 'fred-ops[dashboard]'` (Streamlit, pandas, Altair).
 
 ### Mode Validation Rules
 
@@ -608,7 +669,8 @@ fred-ops run --config config/processor.yml --script src/processor.py
         ┌────────────────────────────┐
         │  Import User Script        │
         │  Discover FredOps instance │
-        │  Get execute() function    │
+        │  Get execute() / storage() │
+        │  Init dashboard (if any)   │
         └────────────┬───────────────┘
                      │
                      ▼
@@ -642,14 +704,16 @@ fred-ops run --config config/processor.yml --script src/processor.py
 fred-ops/
 ├── fred_ops/
 │   ├── __init__.py          # Exports FredOps
-│   ├── app.py               # FredOps class, @execute decorator
-│   ├── cli.py               # Click CLI entry point, script discovery
-│   ├── config.py            # YAML loader, Pydantic model generation
+│   ├── app.py               # FredOps: @execute, optional @storage
+│   ├── cli.py               # Click CLI, script discovery, optional Streamlit child
+│   ├── config.py            # YAML loader, Pydantic models (incl. optional dashboard)
+│   ├── dashboard/           # Streamlit app, SQLite sink, telemetry recorder
 │   └── runtime/
 │       ├── __init__.py
-│       ├── pubsub.py        # PUBSUB runner (subscribe → execute → publish)
-│       ├── pub.py           # PUB runner (generate → publish loop)
-│       └── sub.py           # SUB runner (subscribe → execute)
+│       ├── broker.py        # MQTT client (aiomqtt)
+│       ├── pubsub.py        # PUBSUB runner
+│       ├── pub.py           # PUB runner
+│       └── sub.py           # SUB runner (incl. generic_event_log)
 ├── tests/
 │   ├── test_config.py       # YAML parsing, validation, model generation
 │   ├── test_app.py          # FredOps decorator and registration
@@ -677,6 +741,8 @@ fred-ops/
    - Call `execute(input, OutputModel, **kwargs)`
    - Serialize result → JSON
    - Publish to output topic
+   - Optional: `storage(input, result, **kwargs)`; optional dashboard row
+   - If `storage` raises: logged only (publish already sent)
 
 #### PUB Mode
 
@@ -685,14 +751,16 @@ fred-ops/
    - Call `execute(OutputModel, **kwargs)`
    - Serialize result → JSON
    - Publish to output topic
+   - Optional: `storage(result, **kwargs)`; optional dashboard row
 
 #### SUB Mode
 
 1. Connect to MQTT broker
 2. Subscribe to input topic
 3. For each message:
-   - Parse JSON → InputModel instance
-   - Call `execute(input, **kwargs)`
+   - Parse JSON → InputModel instance (or generic_event_log path)
+   - Call `execute(...)`
+   - Optional: `storage(...)` with the same shape as execute; optional dashboard row
    - (No publish)
 
 ### Error Handling

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import asyncio
 import importlib.util
+import os
+import subprocess
 import sys
 from pathlib import Path
 from typing import Any
@@ -10,6 +12,7 @@ import click
 
 from fred_ops.app import FredOps
 from fred_ops.config import ConfigError, load_config
+from fred_ops.dashboard.recorder import init_dashboard_recorder
 from fred_ops.runtime.pubsub import run_pubsub
 from fred_ops.runtime.pub import run_pub
 from fred_ops.runtime.sub import run_sub
@@ -45,6 +48,45 @@ def _parse_kwarg(ctx, param, value) -> dict[str, str]:
     return result
 
 
+def _spawn_streamlit_dashboard(config_path: str, port: int, host: str) -> subprocess.Popen:
+    try:
+        import streamlit  # noqa: F401
+    except ImportError as e:
+        raise click.ClickException(
+            "Dashboard is enabled but optional dependencies are missing. "
+            "Install with: pip install 'fred-ops[dashboard]' (or uv sync --extra dashboard)."
+        ) from e
+    from fred_ops.dashboard import app as dash_app
+
+    app_file = Path(dash_app.__file__).resolve()
+    env = os.environ.copy()
+    env["FRED_OPS_CONFIG_PATH"] = str(Path(config_path).resolve())
+    args = [
+        sys.executable,
+        "-m",
+        "streamlit",
+        "run",
+        str(app_file),
+        "--server.port",
+        str(port),
+        "--server.address",
+        host,
+        "--browser.gatherUsageStats",
+        "false",
+    ]
+    return subprocess.Popen(args, env=env)
+
+
+def _terminate_process(proc: subprocess.Popen | None) -> None:
+    if proc is None or proc.poll() is not None:
+        return
+    proc.terminate()
+    try:
+        proc.wait(timeout=12)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+
+
 @click.group()
 def main() -> None:
     pass
@@ -64,16 +106,32 @@ def run(config: str, script: str, kwarg: dict[str, str]) -> None:
     try:
         app = _discover_fred_ops_instance(script)
         execute_fn = app.get_execute()
+        storage_fn = app.get_storage()
     except RuntimeError as e:
         raise click.ClickException(str(e))
 
+    init_dashboard_recorder(fred_config)
+    dash_proc: subprocess.Popen | None = None
+    if fred_config.dashboard is not None and fred_config.dashboard.enabled:
+        os.environ["FRED_OPS_CONFIG_PATH"] = str(Path(config).resolve())
+        dash_proc = _spawn_streamlit_dashboard(
+            config,
+            fred_config.dashboard.port,
+            fred_config.dashboard.host,
+        )
+
     mode = fred_config.mode
     try:
-        if mode == "pubsub":
-            asyncio.run(run_pubsub(fred_config, execute_fn, InputModel, OutputModel))
-        elif mode == "pub":
-            asyncio.run(run_pub(fred_config, execute_fn, OutputModel))
-        elif mode == "sub":
-            asyncio.run(run_sub(fred_config, execute_fn, InputModel))
-    except KeyboardInterrupt:
-        click.echo("Stopped.")
+        try:
+            if mode == "pubsub":
+                asyncio.run(
+                    run_pubsub(fred_config, execute_fn, InputModel, OutputModel, storage_fn)
+                )
+            elif mode == "pub":
+                asyncio.run(run_pub(fred_config, execute_fn, OutputModel, storage_fn))
+            elif mode == "sub":
+                asyncio.run(run_sub(fred_config, execute_fn, InputModel, storage_fn))
+        except KeyboardInterrupt:
+            click.echo("Stopped.")
+    finally:
+        _terminate_process(dash_proc)

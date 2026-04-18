@@ -3,38 +3,44 @@ COMPOSE_FILE := docker-compose.yml
 PORTAINER_ADMIN_PASSWORD_FILE := portainer/config/admin_password
 PORTAINER_ADMIN_PASSWORD_EXAMPLE := portainer/config/admin_password.example
 
-.PHONY: help up up-build down down-v build logs logs-bot logs-portainer ps restart restart-portainer stop start pull up-portainer ops-beacon rebuild-ops-beacon portainer-password-check run-dth11
+.PHONY: help up up-build deploy-services down down-v build logs logs-bot logs-dth11 logs-portainer ps restart restart-portainer stop start pull up-portainer ops-beacon rebuild-ops-beacon portainer-password-check run-dth11
 
 .DEFAULT_GOAL := help
 
 help:
-	@echo "Docker Compose (usa $(COMPOSE_FILE) en la raíz del repo)"
-	@echo ""
-	@echo "  make up          - Levantar servicios en segundo plano"
-	@echo "  make up-build    - Construir imágenes y levantar"
-	@echo "  make down        - Parar y eliminar contenedores"
-	@echo "  make down-v      - down y eliminar volúmenes anónimos declarados"
-	@echo "  make build       - Solo construir imágenes"
-	@echo "  make logs        - Seguir logs de todos los servicios"
-	@echo "  make logs-bot    - Seguir logs del servicio bot-telegram"
-	@echo "  make logs-portainer - Seguir logs del servicio portainer"
-	@echo "  make ps          - Estado de contenedores"
-	@echo "  make restart     - Reiniciar contenedores"
-	@echo "  make restart-portainer - Reiniciar solo portainer"
-	@echo "  make stop        - Parar sin eliminar contenedores"
-	@echo "  make start       - Arrancar contenedores existentes"
-	@echo "  make up-portainer - Levantar solo portainer (con build)"
-	@echo "  make portainer-password-check - Validar presencia de portainer/config/admin_password"
-	@echo "  make ops-beacon  - Levantar servicios base de la app ops-beacon (inicialmente portainer)"
-	@echo "  make rebuild-ops-beacon - Parar, reconstruir y levantar ops-beacon"
-	@echo "  make pull        - Descargar imágenes base (si aplica)"
-	@echo "  make run-dth11   - Run dth-11 processor (requires MQTT broker at localhost:1883)"
+	@printf '%s\n\n' \
+		'Docker Compose (usa $(COMPOSE_FILE) en la raíz del repo)'
+	@printf '  make %-22s  - %s\n' \
+		up                    'Levantar servicios en segundo plano' \
+		up-build              'Construir imágenes y levantar' \
+		deploy-services       'Construir y levantar dth-11-processor' \
+		down                  'Parar y eliminar contenedores' \
+		down-v                'down y eliminar volúmenes anónimos declarados' \
+		build                 'Solo construir imágenes' \
+		logs                  'Seguir logs de todos los servicios' \
+		logs-bot              'Seguir logs del servicio bot-telegram' \
+		logs-dth11            'Seguir logs del servicio dth-11-processor' \
+		logs-portainer        'Seguir logs del servicio portainer' \
+		ps                    'Estado de contenedores' \
+		restart               'Reiniciar contenedores' \
+		restart-portainer     'Reiniciar solo portainer' \
+		stop                  'Parar sin eliminar contenedores' \
+		start                 'Arrancar contenedores existentes' \
+		up-portainer          'Levantar solo portainer (con build)' \
+		portainer-password-check 'Validar presencia de portainer/config/admin_password' \
+		ops-beacon            'Levantar servicios base de la app ops-beacon (inicialmente portainer)' \
+		rebuild-ops-beacon    'Parar, reconstruir y levantar ops-beacon' \
+		pull                  'Descargar imágenes base (si aplica)' \
+		run-dth11             'Run dth-11 processor (requires MQTT broker at localhost:1883)'
 
 up:
 	$(COMPOSE) -f $(COMPOSE_FILE) up -d
 
 up-build:
 	$(COMPOSE) -f $(COMPOSE_FILE) up -d --build
+
+deploy-services:
+	$(COMPOSE) -f $(COMPOSE_FILE) up -d --build dth-11-processor
 
 down:
 	$(COMPOSE) -f $(COMPOSE_FILE) down
@@ -50,6 +56,9 @@ logs:
 
 logs-bot:
 	$(COMPOSE) -f $(COMPOSE_FILE) logs -f bot-telegram
+
+logs-dth11:
+	$(COMPOSE) -f $(COMPOSE_FILE) logs -f dth-11-processor
 
 logs-portainer:
 	$(COMPOSE) -f $(COMPOSE_FILE) logs -f portainer
@@ -88,4 +97,4 @@ portainer-password-check:
 	@test -f "$(PORTAINER_ADMIN_PASSWORD_FILE)" || (echo "Falta $(PORTAINER_ADMIN_PASSWORD_FILE). Crea uno con: cp $(PORTAINER_ADMIN_PASSWORD_EXAMPLE) $(PORTAINER_ADMIN_PASSWORD_FILE)"; exit 1)
 
 run-dth11:
-	cd dth-11-processor && uv run --with ../fred-ops fred-ops run --config config.yml --script processor.py
+	cd dth-11-processor && uv run fred-ops run --config config.yml --script processor.py
