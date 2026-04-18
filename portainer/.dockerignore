@@ -1,0 +1,5 @@
+.git
+.gitignore
+config/admin_password
+!config/admin_password.example
+*.log

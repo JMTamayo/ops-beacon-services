@@ -17,3 +17,22 @@ services:
       CONFIG_PATH: /app/config/config.yaml
     volumes:
       - ./bot-telegram/config/config.yaml:/app/config/config.yaml:ro
+
+  portainer:
+    build: ./portainer
+    container_name: portainer
+    restart: unless-stopped
+    command:
+      - --http-enabled
+      - --admin-password-file
+      - /run/portainer-config/admin_password
+    ports:
+      - "9000:9000"
+      - "9443:9443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - portainer_data:/data
+      - ./portainer/config:/run/portainer-config:ro
+
+volumes:
+  portainer_data:
