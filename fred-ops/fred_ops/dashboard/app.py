@@ -18,12 +18,12 @@ import yaml
 
 from fred_ops.config import DashboardConfig, FredOpsConfig
 
-# Zona horaria para mostrar instantes (IANA). Override: export FRED_OPS_DASHBOARD_TZ=UTC
+# IANA timezone for displayed timestamps. Override: export FRED_OPS_DASHBOARD_TZ=UTC
 _DASHBOARD_TZ = os.environ.get("FRED_OPS_DASHBOARD_TZ", "America/Bogota")
 
 
 def _ts_series_to_display_datetimes(ts_series: pd.Series) -> pd.Series:
-    """Convierte epoch float (s) a Timestamp con zona horaria legible."""
+    """Convert epoch seconds to timezone-aware timestamps for display."""
     dt_utc = pd.to_datetime(ts_series, unit="s", utc=True)
     try:
         return dt_utc.dt.tz_convert(_DASHBOARD_TZ)
@@ -51,7 +51,7 @@ def _sqlite_path() -> str:
 
 
 def _flatten_payload_scalars(obj: Any, prefix: str = "") -> dict[str, Any]:
-    """Aplana JSON a columnas: números, texto, booleanos y listas serializadas (para tabla)."""
+    """Flatten JSON into table columns (numbers, strings, bools; lists as JSON strings)."""
     out: dict[str, Any] = {}
     key = prefix.rstrip(".") if prefix else ""
 
@@ -101,12 +101,12 @@ def _numeric_columns_for_chart(df: pd.DataFrame) -> list[str]:
 
 
 def _dataframe_column_config(df: pd.DataFrame) -> dict[str, Any]:
-    """Tipos de columna para la tabla: fecha corta, números, texto, booleanos."""
+    """Column types for the data table: short datetime, numbers, text, booleans."""
     cfg: dict[str, Any] = {}
     for col in df.columns:
         if col == "ts":
             cfg[col] = st.column_config.DatetimeColumn(
-                "Hora",
+                "Time",
                 format="DD/MM/YY HH:mm",
             )
         elif pd.api.types.is_bool_dtype(df[col]):
@@ -154,17 +154,19 @@ def main() -> None:
     cfg = _load_config()
     if cfg.dashboard is None or not cfg.dashboard.enabled:
         st.error(
-            "El dashboard está desactivado. Añade una sección `dashboard` en el YAML con `enabled: true`."
+            "Dashboard is disabled. Add a `dashboard` section to your YAML with `enabled: true`."
         )
         st.stop()
     dashboard_cfg: DashboardConfig = cfg.dashboard
     db_path = _sqlite_path()
 
     st.title("fred-ops · dashboard")
-    st.caption(f"Modo: **{cfg.mode}** · SQLite: `{db_path}`")
+    st.caption(f"Mode: **{cfg.mode}** · SQLite: `{db_path}`")
 
     if not Path(db_path).is_file():
-        st.warning("Aún no hay base de datos. Arranca el procesador MQTT con `dashboard.enabled: true`.")
+        st.warning(
+            "No database file yet. Start the MQTT processor with `dashboard.enabled: true` in config."
+        )
         return
 
     @st.cache_resource
@@ -177,20 +179,26 @@ def main() -> None:
     def _refresh() -> None:
         df = _events_to_frame(conn, limit=min(dashboard_cfg.max_rows, 2000))
         if df.empty:
-            st.info("Sin eventos todavía. Cuando lleguen mensajes MQTT aparecerán aquí.")
+            st.info("No events yet. MQTT messages will appear here once they arrive.")
             return
 
         numeric_cols = _numeric_columns_for_chart(df)
-        st.subheader("Serie temporal")
-        st.caption(f"Hora mostrada en **{_DASHBOARD_TZ}** · `FRED_OPS_DASHBOARD_TZ` en el entorno para otra zona IANA (p. ej. `UTC`).")
+        st.subheader("Time series")
+        st.caption(
+            f"Time shown in **{_DASHBOARD_TZ}** · set `FRED_OPS_DASHBOARD_TZ` for another IANA zone (e.g. `UTC`)."
+        )
         if numeric_cols:
-            y_choice = st.multiselect("Campos numéricos (eje Y)", numeric_cols, default=numeric_cols[: min(3, len(numeric_cols))])
+            y_choice = st.multiselect(
+                "Numeric fields (Y axis)",
+                numeric_cols,
+                default=numeric_cols[: min(3, len(numeric_cols))],
+            )
             if y_choice:
                 chart_df = df[["ts"] + y_choice].dropna(how="all", subset=y_choice)
                 long_df = chart_df.melt(
                     id_vars=["ts"],
-                    var_name="serie",
-                    value_name="valor",
+                    var_name="series",
+                    value_name="value",
                 )
                 chart = (
                     alt.Chart(long_df)
@@ -198,19 +206,19 @@ def main() -> None:
                     .encode(
                         x=alt.X(
                             "ts:T",
-                            title="Hora",
+                            title="Time",
                             axis=alt.Axis(
                                 format="%d/%m/%y %H:%M",
                                 labelAngle=-35,
                                 tickCount=8,
                             ),
                         ),
-                        y=alt.Y("valor:Q", title="Valor"),
-                        color=alt.Color("serie:N", title="Serie"),
+                        y=alt.Y("value:Q", title="Value"),
+                        color=alt.Color("series:N", title="Series"),
                         tooltip=[
-                            alt.Tooltip("ts:T", title="Hora", format="%d/%m/%y %H:%M:%S"),
-                            alt.Tooltip("serie:N", title="Campo"),
-                            alt.Tooltip("valor:Q", title="Valor", format=".6g"),
+                            alt.Tooltip("ts:T", title="Time", format="%d/%m/%y %H:%M:%S"),
+                            alt.Tooltip("series:N", title="Field"),
+                            alt.Tooltip("value:Q", title="Value", format=".6g"),
                         ],
                     )
                     .properties(height=320)
@@ -218,9 +226,11 @@ def main() -> None:
                 )
                 st.altair_chart(chart, use_container_width=True)
         else:
-            st.caption("No hay campos numéricos en los últimos registros; revisa el schema o el payload JSON.")
+            st.caption(
+                "No numeric fields in recent rows; check your schema or JSON payload."
+            )
 
-        st.subheader("Últimos registros")
+        st.subheader("Latest rows")
         show = df.sort_values("ts", ascending=False).head(200)
         st.dataframe(
             show,

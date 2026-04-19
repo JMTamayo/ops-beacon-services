@@ -11,6 +11,7 @@ from typing import Any
 import click
 
 from fred_ops.app import FredOps
+from fred_ops.logging_config import configure_logging
 from fred_ops.config import ConfigError, load_config
 from fred_ops.dashboard.recorder import init_dashboard_recorder
 from fred_ops.runtime.pubsub import run_pubsub
@@ -98,6 +99,7 @@ def main() -> None:
 @click.option("--kwarg", "-k", multiple=True, callback=_parse_kwarg, is_eager=False, help="Extra key=value forwarded to execute (repeatable)")
 def run(config: str, script: str, kwarg: dict[str, str]) -> None:
     """Launch an MQTT processor from a config file and script."""
+    configure_logging()
     try:
         fred_config, InputModel, OutputModel = load_config(config, cli_kwargs=kwarg)
     except ConfigError as e:

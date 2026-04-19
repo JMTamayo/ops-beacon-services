@@ -8,7 +8,7 @@ from pydantic import BaseModel, ValidationError
 
 from fred_ops.config import FredOpsConfig
 from fred_ops.dashboard.recorder import maybe_record_dashboard
-from fred_ops.runtime.broker import connect_broker
+from fred_ops.runtime.broker import run_mqtt_session_with_reconnect
 
 logger = logging.getLogger(__name__)
 
@@ -26,9 +26,9 @@ async def run_sub(
     if InputModel is None:
         raise RuntimeError("InputModel is required when generic_event_log is false")
 
-    client = await connect_broker(config.broker)
-    async with client:
+    async def _connected(client, on_session_ready):
         await client.subscribe(config.input.topic)
+        on_session_ready()
         async for message in client.messages:
             try:
                 payload = json.loads(message.payload)
@@ -54,6 +54,8 @@ async def run_sub(
                 logger.exception("execute raised an exception, skipping message")
                 continue
 
+    await run_mqtt_session_with_reconnect(config.broker, _connected)
+
 
 async def _run_sub_generic_event_log(
     config: FredOpsConfig,
@@ -61,9 +63,10 @@ async def _run_sub_generic_event_log(
     storage_fn: Callable[..., Any] | None = None,
 ) -> None:
     """Subscribe and forward each message with mqtt_topic, payload_json, payload_bytes."""
-    client = await connect_broker(config.broker)
-    async with client:
+
+    async def _connected(client, on_session_ready):
         await client.subscribe(config.input.topic)
+        on_session_ready()
         logger.info(
             "generic_event_log: subscribed to topic=%s",
             config.input.topic,
@@ -125,3 +128,5 @@ async def _run_sub_generic_event_log(
                     topic_str,
                 )
                 continue
+
+    await run_mqtt_session_with_reconnect(config.broker, _connected)

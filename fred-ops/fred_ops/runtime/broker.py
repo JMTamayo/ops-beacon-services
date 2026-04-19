@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
+from collections.abc import Awaitable, Callable
 from typing import Any
 
 import aiomqtt
@@ -10,6 +11,64 @@ import aiomqtt
 from fred_ops.config import BrokerConfig
 
 logger = logging.getLogger(__name__)
+
+
+class BrokerReconnectExhausted(Exception):
+    """Raised when the broker could not be reached after ``reconnect_max_attempts`` failures in a row."""
+
+
+_RECONNECTABLE_ERRORS: tuple[type[BaseException], ...] = (
+    aiomqtt.MqttError,
+    ConnectionError,
+    TimeoutError,
+    OSError,
+)
+
+
+async def run_mqtt_session_with_reconnect(
+    broker: BrokerConfig,
+    connected_work: Callable[[aiomqtt.Client, Callable[[], None]], Awaitable[None]],
+) -> None:
+    """
+    Connect, run ``connected_work(client, on_session_ready)`` inside ``async with client``,
+    and on transport failures retry until ``reconnect_max_attempts`` failures occur without
+    resetting the counter. Call ``on_session_ready()`` after a successful subscribe (or
+    publish in pub mode) so each **fully recovered** session clears the failure streak.
+
+    If ``connected_work`` returns without raising (e.g. finite test iterator), the loop ends.
+    """
+    consecutive_failures = 0
+
+    def on_session_ready() -> None:
+        nonlocal consecutive_failures
+        consecutive_failures = 0
+
+    while True:
+        try:
+            client = await connect_broker(broker)
+            async with client:
+                await connected_work(client, on_session_ready)
+            return
+        except asyncio.CancelledError:
+            raise
+        except _RECONNECTABLE_ERRORS as e:
+            consecutive_failures += 1
+            logger.warning(
+                "MQTT connection or session lost (%s/%s; counter resets after a successful "
+                "subscribe or publish): %s: %s",
+                consecutive_failures,
+                broker.reconnect_max_attempts,
+                type(e).__name__,
+                e,
+            )
+            if consecutive_failures >= broker.reconnect_max_attempts:
+                msg = (
+                    f"Could not restore MQTT connection after {broker.reconnect_max_attempts} "
+                    f"consecutive failures without a healthy session (last error: {e})"
+                )
+                logger.error(msg)
+                raise BrokerReconnectExhausted(msg) from e
+            await asyncio.sleep(broker.reconnect_delay_seconds)
 
 
 async def connect_broker(config: BrokerConfig) -> aiomqtt.Client:
@@ -30,11 +89,14 @@ async def connect_broker(config: BrokerConfig) -> aiomqtt.Client:
     Raises:
         Propagates connection exceptions from aiomqtt
     """
-    # Log configuration before attempting connection
-    auth_status = "activada" if config.username else "desactivada"
+    auth_status = "enabled" if config.username else "disabled"
     logger.info(
-        f"Conectando a Broker MQTT: host={config.host}, port={config.port}, "
-        f"client_id={config.client_id}, protocol=v3.1.1, autenticación={auth_status}"
+        "Connecting to MQTT broker: host=%s, port=%s, client_id=%s, protocol=MQTTv3.1.1, "
+        "authentication=%s",
+        config.host,
+        config.port,
+        config.client_id,
+        auth_status,
     )
 
     start_time = time.perf_counter()
@@ -55,9 +117,7 @@ async def connect_broker(config: BrokerConfig) -> aiomqtt.Client:
 
         # Log successful connection with timing
         duration = time.perf_counter() - start_time
-        logger.info(
-            f"✓ Conexión al Broker MQTT establecida (duración: {duration:.2f}s)"
-        )
+        logger.info("MQTT broker connection established (%.2fs)", duration)
 
         # Return a new client for the caller to use with async with
         return aiomqtt.Client(
@@ -73,7 +133,10 @@ async def connect_broker(config: BrokerConfig) -> aiomqtt.Client:
         # Log error with context and re-raise (fail fast)
         error_type = type(e).__name__
         logger.error(
-            f"✗ Error al conectar a Broker MQTT en {config.host}:{config.port} "
-            f"— {error_type}: {str(e)}"
+            "Failed to connect to MQTT broker at %s:%s — %s: %s",
+            config.host,
+            config.port,
+            error_type,
+            e,
         )
         raise

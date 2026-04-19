@@ -7,7 +7,7 @@ from pydantic import BaseModel
 
 from fred_ops.config import FredOpsConfig
 from fred_ops.dashboard.recorder import maybe_record_dashboard
-from fred_ops.runtime.broker import connect_broker
+from fred_ops.runtime.broker import run_mqtt_session_with_reconnect
 
 logger = logging.getLogger(__name__)
 
@@ -18,12 +18,12 @@ async def run_pub(
     OutputModel: type[BaseModel],
     storage_fn: Callable[..., Any] | None = None,
 ) -> None:
-    client = await connect_broker(config.broker)
-    async with client:
+    async def _connected(client, on_session_ready):
         while True:
             try:
                 result = await execute_fn(OutputModel, **config.kwargs)
                 await client.publish(config.output.topic, result.model_dump_json())
+                on_session_ready()
                 maybe_record_dashboard(
                     config,
                     input_payload=None,
@@ -40,3 +40,5 @@ async def run_pub(
                 # process exits rather than silently spinning in a broken state.
                 logger.exception("execute raised an exception, stopping")
                 raise
+
+    await run_mqtt_session_with_reconnect(config.broker, _connected)

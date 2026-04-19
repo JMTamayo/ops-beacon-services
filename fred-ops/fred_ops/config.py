@@ -28,6 +28,16 @@ class BrokerConfig(BaseModel):
     username: str | None = None
     password: str | None = None
     client_id: str | None = None
+    reconnect_max_attempts: int = Field(
+        default=10,
+        ge=1,
+        description="Consecutive connection/session failures before giving up.",
+    )
+    reconnect_delay_seconds: float = Field(
+        default=5.0,
+        ge=0,
+        description="Delay before retrying after a failed connect or dropped session.",
+    )
 
 
 class TopicConfig(BaseModel):
