@@ -10,8 +10,10 @@ ENER_VAULT_ENV_FILE := ener-vault/config/.env
 ENER_VAULT_ENV_EXAMPLE := ener-vault/config/.env.example
 METER_OPS_CONFIG_FILE := meter-ops/config/config.yml
 METER_OPS_CONFIG_EXAMPLE := meter-ops/config/config.yml.example
+VICTOR_IA_ENV_FILE := victor-ia/config/.env
+VICTOR_IA_ENV_EXAMPLE := victor-ia/config/.env.example
 
-.PHONY: help up up-build deploy-services down down-v build logs logs-bot logs-dth11 logs-meter-ops logs-portainer logs-postgres logs-ener-vault ps restart restart-portainer stop start pull up-portainer ops-beacon rebuild-ops-beacon portainer-password-check postgres-config-check ener-vault-config-check meter-ops-config-check run-dth11 run-meter-ops
+.PHONY: help up up-build deploy-services down down-v build logs logs-bot logs-dth11 logs-meter-ops logs-victor-ia logs-portainer logs-postgres logs-ener-vault ps restart restart-portainer stop start pull up-portainer ops-beacon ops-beacon-victor rebuild-ops-beacon portainer-password-check postgres-config-check ener-vault-config-check meter-ops-config-check victor-ia-config-check run-dth11 run-meter-ops
 
 .DEFAULT_GOAL := help
 
@@ -29,6 +31,7 @@ help:
 		logs-bot              'Seguir logs del servicio bot-telegram' \
 		logs-dth11            'Seguir logs del servicio dth-11-processor' \
 		logs-meter-ops        'Seguir logs del servicio meter-ops' \
+		logs-victor-ia        'Seguir logs del servicio victor-ia' \
 		logs-portainer        'Seguir logs del servicio portainer' \
 		logs-postgres         'Seguir logs del servicio postgres' \
 		logs-ener-vault       'Seguir logs del servicio ener-vault' \
@@ -39,8 +42,9 @@ help:
 		start                 'Arrancar contenedores existentes' \
 		up-portainer          'Levantar solo portainer (con build)' \
 		portainer-password-check 'Validar presencia de portainer/config/admin_password' \
-		ops-beacon            'Levantar portainer, postgres, ener-vault y meter-ops (checks de config)' \
+		ops-beacon            'Levantar portainer, postgres, ener-vault, meter-ops y victor-ia (checks de config)' \
 		rebuild-ops-beacon    'Parar, reconstruir y levantar ops-beacon' \
+		ops-beacon-victor     'Alias de ops-beacon (compatibilidad)' \
 		pull                  'Descargar imágenes base (si aplica)' \
 		run-dth11             'Run dth-11 processor (requires MQTT broker at localhost:1883)' \
 		run-meter-ops         'Run meter-ops (requires MQTT broker)'
@@ -74,6 +78,9 @@ logs-dth11:
 
 logs-meter-ops:
 	$(COMPOSE) -f $(COMPOSE_FILE) logs -f meter-ops
+
+logs-victor-ia:
+	$(COMPOSE) -f $(COMPOSE_FILE) logs -f victor-ia
 
 logs-portainer:
 	$(COMPOSE) -f $(COMPOSE_FILE) logs -f portainer
@@ -111,7 +118,10 @@ ops-beacon:
 	$(MAKE) postgres-config-check
 	$(MAKE) ener-vault-config-check
 	$(MAKE) meter-ops-config-check
-	$(COMPOSE) -f $(COMPOSE_FILE) up -d --build portainer postgres ener-vault meter-ops
+	$(MAKE) victor-ia-config-check
+	$(COMPOSE) -f $(COMPOSE_FILE) up -d --build portainer postgres ener-vault meter-ops victor-ia
+
+ops-beacon-victor: ops-beacon
 
 rebuild-ops-beacon:
 	$(COMPOSE) -f $(COMPOSE_FILE) down
@@ -129,6 +139,9 @@ ener-vault-config-check:
 
 meter-ops-config-check:
 	@test -f "$(METER_OPS_CONFIG_FILE)" || (echo "Falta $(METER_OPS_CONFIG_FILE). Crea uno con: cp $(METER_OPS_CONFIG_EXAMPLE) $(METER_OPS_CONFIG_FILE)"; exit 1)
+
+victor-ia-config-check:
+	@test -f "$(VICTOR_IA_ENV_FILE)" || (echo "Falta $(VICTOR_IA_ENV_FILE). Crea uno con: cp $(VICTOR_IA_ENV_EXAMPLE) $(VICTOR_IA_ENV_FILE) y define LLM_API_KEY"; exit 1)
 
 run-dth11:
 	cd dth-11-processor && uv run fred-ops run --config config.yml --script processor.py

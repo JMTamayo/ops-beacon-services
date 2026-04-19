@@ -11,8 +11,9 @@ Monorepo de servicios alrededor de **ops-beacon** (eventos de operación).
   - versión fijada: `portainer/portainer-ce:2.27.9`.
 - **postgres**: PostgreSQL para datos persistentes del API **ener-vault** (esquema `energy_meters`).
 - **ener-vault**: API FastAPI para medidores, mediciones, catálogo de **entidades** (tipos de carga) y **asignaciones** medidor–entidad con ventanas de tiempo y restricción de solapes por dispositivo.
+- **victor-ia**: agente HTTP (FastAPI + LangGraph) con herramientas extensibles para consultar **ener-vault** y otras integraciones futuras. Ver [`victor-ia/README.md`](victor-ia/README.md). Puerto por defecto en Compose: **8083**.
 
-## Stack ops-beacon (Portainer + Postgres + ener-vault)
+## Stack ops-beacon (Portainer + Postgres + ener-vault + meter-ops + victor-ia)
 
 Objetivo: levantar Portainer, la base de datos y el API de mediciones con un solo objetivo de Make.
 
@@ -40,22 +41,28 @@ Objetivo: levantar Portainer, la base de datos y el API de mediciones con un sol
 3. El servicio envía mediciones a **ener-vault** (`POST /v1/measurements`); el UUID del topic se usa como `device_id` (debe existir en `/v1/devices`).
 4. **Dashboard Streamlit** (fred-ops): opcional; en `meter-ops/config/config.yml` pon `dashboard.enabled: true`. En Docker el mapeo es **8502 → 8501** del contenedor: abre **http://localhost:8502**.
 
+**victor-ia**:
+
+1. `cp victor-ia/config/.env.example victor-ia/config/.env`
+2. Definir `LLM_API_KEY` y `SERVER_API_KEY_VALUE_HASHED` (ver [`victor-ia/README.md`](victor-ia/README.md)).
+
 ### 2. Arranque
 
 ```bash
 make ops-beacon
 ```
 
-Esto valida los archivos anteriores y ejecuta `docker compose up -d --build portainer postgres ener-vault meter-ops`.
+Esto valida los archivos anteriores y ejecuta `docker compose up -d --build portainer postgres ener-vault meter-ops victor-ia`.
 
 - **ener-vault** (HTTP): `http://localhost:8080`
 - **Postgres**: `localhost:5432`
 - **Portainer**: `http://localhost:9000` o `https://localhost:9443`
 - **meter-ops dashboard** (solo si `dashboard.enabled: true` en `meter-ops/config/config.yml`): `http://localhost:8502`
+- **victor-ia** (HTTP): `http://localhost:8083`
 
 `meter-ops` arranca después de que **ener-vault** esté sano (dependencia en Compose + espera al API en el entrypoint de la imagen).
 
-Logs útiles: `make logs-postgres`, `make logs-ener-vault`, `make logs-meter-ops`.
+Logs útiles: `make logs-postgres`, `make logs-ener-vault`, `make logs-meter-ops`, `make logs-victor-ia`.
 
 ### 3. Migraciones (ener-vault)
 

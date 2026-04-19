@@ -90,6 +90,20 @@ services:
       postgres:
         condition: service_healthy
 
+  victor-ia:
+    build:
+      context: .
+      dockerfile: victor-ia/Dockerfile
+    container_name: victor-ia
+    restart: unless-stopped
+    env_file:
+      - ./victor-ia/config/.env
+    ports:
+      - "8083:8083"
+    depends_on:
+      ener-vault:
+        condition: service_healthy
+
 volumes:
   portainer_data:
   postgres_data:
