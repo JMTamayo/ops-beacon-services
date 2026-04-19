@@ -8,7 +8,7 @@ from pydantic import BaseModel, ValidationError
 
 from fred_ops.config import FredOpsConfig
 from fred_ops.dashboard.recorder import maybe_record_dashboard
-from fred_ops.runtime.broker import connect_broker
+from fred_ops.runtime.broker import run_mqtt_session_with_reconnect
 
 logger = logging.getLogger(__name__)
 
@@ -20,9 +20,9 @@ async def run_pubsub(
     OutputModel: type[BaseModel],
     storage_fn: Callable[..., Any] | None = None,
 ) -> None:
-    client = await connect_broker(config.broker)
-    async with client:
+    async def _connected(client, on_session_ready):
         await client.subscribe(config.input.topic)
+        on_session_ready()
         async for message in client.messages:
             try:
                 payload = json.loads(message.payload)
@@ -46,3 +46,5 @@ async def run_pubsub(
                         logger.exception("storage raised an exception, continuing")
             except Exception:
                 logger.exception("execute raised an exception, skipping message")
+
+    await run_mqtt_session_with_reconnect(config.broker, _connected)

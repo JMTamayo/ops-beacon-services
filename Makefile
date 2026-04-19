@@ -8,8 +8,10 @@ POSTGRES_ENV_FILE := postgres/config/.env
 POSTGRES_ENV_EXAMPLE := postgres/config/.env.example
 ENER_VAULT_ENV_FILE := ener-vault/config/.env
 ENER_VAULT_ENV_EXAMPLE := ener-vault/config/.env.example
+METER_OPS_CONFIG_FILE := meter-ops/config/config.yml
+METER_OPS_CONFIG_EXAMPLE := meter-ops/config/config.yml.example
 
-.PHONY: help up up-build deploy-services down down-v build logs logs-bot logs-dth11 logs-portainer logs-postgres logs-ener-vault ps restart restart-portainer stop start pull up-portainer ops-beacon rebuild-ops-beacon portainer-password-check postgres-config-check ener-vault-config-check run-dth11
+.PHONY: help up up-build deploy-services down down-v build logs logs-bot logs-dth11 logs-meter-ops logs-portainer logs-postgres logs-ener-vault ps restart restart-portainer stop start pull up-portainer ops-beacon rebuild-ops-beacon portainer-password-check postgres-config-check ener-vault-config-check meter-ops-config-check run-dth11 run-meter-ops
 
 .DEFAULT_GOAL := help
 
@@ -26,6 +28,7 @@ help:
 		logs                  'Seguir logs de todos los servicios' \
 		logs-bot              'Seguir logs del servicio bot-telegram' \
 		logs-dth11            'Seguir logs del servicio dth-11-processor' \
+		logs-meter-ops        'Seguir logs del servicio meter-ops' \
 		logs-portainer        'Seguir logs del servicio portainer' \
 		logs-postgres         'Seguir logs del servicio postgres' \
 		logs-ener-vault       'Seguir logs del servicio ener-vault' \
@@ -36,10 +39,11 @@ help:
 		start                 'Arrancar contenedores existentes' \
 		up-portainer          'Levantar solo portainer (con build)' \
 		portainer-password-check 'Validar presencia de portainer/config/admin_password' \
-		ops-beacon            'Levantar portainer, postgres y ener-vault (checks de config)' \
+		ops-beacon            'Levantar portainer, postgres, ener-vault y meter-ops (checks de config)' \
 		rebuild-ops-beacon    'Parar, reconstruir y levantar ops-beacon' \
 		pull                  'Descargar imágenes base (si aplica)' \
-		run-dth11             'Run dth-11 processor (requires MQTT broker at localhost:1883)'
+		run-dth11             'Run dth-11 processor (requires MQTT broker at localhost:1883)' \
+		run-meter-ops         'Run meter-ops (requires MQTT broker)'
 
 up:
 	$(COMPOSE) -f $(COMPOSE_FILE) up -d
@@ -67,6 +71,9 @@ logs-bot:
 
 logs-dth11:
 	$(COMPOSE) -f $(COMPOSE_FILE) logs -f dth-11-processor
+
+logs-meter-ops:
+	$(COMPOSE) -f $(COMPOSE_FILE) logs -f meter-ops
 
 logs-portainer:
 	$(COMPOSE) -f $(COMPOSE_FILE) logs -f portainer
@@ -103,7 +110,8 @@ ops-beacon:
 	$(MAKE) portainer-password-check
 	$(MAKE) postgres-config-check
 	$(MAKE) ener-vault-config-check
-	$(COMPOSE) -f $(COMPOSE_FILE) up -d --build portainer postgres ener-vault
+	$(MAKE) meter-ops-config-check
+	$(COMPOSE) -f $(COMPOSE_FILE) up -d --build portainer postgres ener-vault meter-ops
 
 rebuild-ops-beacon:
 	$(COMPOSE) -f $(COMPOSE_FILE) down
@@ -119,5 +127,11 @@ postgres-config-check:
 ener-vault-config-check:
 	@test -f "$(ENER_VAULT_ENV_FILE)" || (echo "Falta $(ENER_VAULT_ENV_FILE). Crea uno con: cp $(ENER_VAULT_ENV_EXAMPLE) $(ENER_VAULT_ENV_FILE)"; exit 1)
 
+meter-ops-config-check:
+	@test -f "$(METER_OPS_CONFIG_FILE)" || (echo "Falta $(METER_OPS_CONFIG_FILE). Crea uno con: cp $(METER_OPS_CONFIG_EXAMPLE) $(METER_OPS_CONFIG_FILE)"; exit 1)
+
 run-dth11:
 	cd dth-11-processor && uv run fred-ops run --config config.yml --script processor.py
+
+run-meter-ops:
+	cd meter-ops && uv run fred-ops run --config config/config.yml --script app/main.py

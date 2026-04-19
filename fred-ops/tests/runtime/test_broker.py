@@ -88,8 +88,11 @@ async def test_connect_broker_logs_success():
                 await connect_broker(broker_config)
 
                 # Verify success was logged
-                success_logs = [call for call in mock_logger.info.call_args_list
-                               if "Conexión" in str(call) or "establecida" in str(call)]
+                success_logs = [
+                    call
+                    for call in mock_logger.info.call_args_list
+                    if "established" in str(call) or "connection" in str(call).lower()
+                ]
                 assert len(success_logs) > 0
                 # Verify that the success log contains the duration
                 success_msg = success_logs[0][0][0]

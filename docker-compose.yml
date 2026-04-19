@@ -29,6 +29,20 @@ services:
     volumes:
       - ./dth-11-processor/config.yml:/app/dth-11-processor/config.yml:ro
 
+  meter-ops:
+    build:
+      context: .
+      dockerfile: meter-ops/Dockerfile
+    container_name: meter-ops
+    restart: unless-stopped
+    ports:
+      - "8502:8501"
+    depends_on:
+      ener-vault:
+        condition: service_healthy
+    volumes:
+      - ./meter-ops/config/config.yml:/app/meter-ops/config/config.yml:ro
+
   bot-telegram:
     build: ./bot-telegram
     ports:
@@ -62,6 +76,16 @@ services:
       - ./ener-vault/config/.env
     ports:
       - "8080:8080"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          'python -c "import urllib.request; urllib.request.urlopen(\"http://127.0.0.1:8080/health\")"',
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
     depends_on:
       postgres:
         condition: service_healthy

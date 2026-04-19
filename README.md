@@ -6,6 +6,7 @@ Monorepo de servicios alrededor de **ops-beacon** (eventos de operación).
 
 - **bot-telegram**: notificador MQTT → Telegram. Ver [`bot-telegram/README.md`](bot-telegram/README.md).
 - **dth-11-processor**: procesador MQTT (fred-ops). Ver [`dth-11-processor/README.md`](dth-11-processor/README.md).
+- **meter-ops**: procesador MQTT (fred-ops) para lecturas de medidores. Ver [`meter-ops/README.md`](meter-ops/README.md).
 - **portainer**: UI para administrar Docker localmente.
   - versión fijada: `portainer/portainer-ce:2.27.9`.
 - **postgres**: PostgreSQL para datos persistentes del API **ener-vault** (esquema `energy_meters`).
@@ -32,19 +33,29 @@ Objetivo: levantar Portainer, la base de datos y el API de mediciones con un sol
 1. `cp ener-vault/config/.env.example ener-vault/config/.env`
 2. Definir `DATABASE_URL` apuntando al Postgres del compose (por ejemplo host `postgres`, puerto `5432`, usuario/clave y base alineados con `postgres/config/.env`).
 
+**meter-ops**:
+
+1. `cp meter-ops/config/config.yml.example meter-ops/config/config.yml`
+2. Ajustar `broker.host` y `input.topic` (patrón esperado: `/volttio/<uuid>/energy-stats`; suele usarse `generic_event_log: true` para recibir el topic exacto y validar el payload en código).
+3. El servicio envía mediciones a **ener-vault** (`POST /v1/measurements`); el UUID del topic se usa como `device_id` (debe existir en `/v1/devices`).
+4. **Dashboard Streamlit** (fred-ops): opcional; en `meter-ops/config/config.yml` pon `dashboard.enabled: true`. En Docker el mapeo es **8502 → 8501** del contenedor: abre **http://localhost:8502**.
+
 ### 2. Arranque
 
 ```bash
 make ops-beacon
 ```
 
-Esto valida los archivos anteriores y ejecuta `docker compose up -d --build portainer postgres ener-vault`.
+Esto valida los archivos anteriores y ejecuta `docker compose up -d --build portainer postgres ener-vault meter-ops`.
 
 - **ener-vault** (HTTP): `http://localhost:8080`
 - **Postgres**: `localhost:5432`
 - **Portainer**: `http://localhost:9000` o `https://localhost:9443`
+- **meter-ops dashboard** (solo si `dashboard.enabled: true` en `meter-ops/config/config.yml`): `http://localhost:8502`
 
-Logs útiles: `make logs-postgres`, `make logs-ener-vault`.
+`meter-ops` arranca después de que **ener-vault** esté sano (dependencia en Compose + espera al API en el entrypoint de la imagen).
+
+Logs útiles: `make logs-postgres`, `make logs-ener-vault`, `make logs-meter-ops`.
 
 ### 3. Migraciones (ener-vault)
 
