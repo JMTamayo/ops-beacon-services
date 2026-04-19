@@ -1,0 +1,27 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]
+
+[project]
+name = "meter-ops"
+version = "0.1.0"
+description = "MQTT subscriber for meter readings via fred-ops"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "fred-ops[dashboard]",
+    "httpx>=0.28.1",
+]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.15.11",
+]
+
+[tool.uv.sources]
+# Editable: always import ../fred-ops from disk (avoids stale Spanish strings after fred-ops changes).
+fred-ops = { path = "../fred-ops", editable = true }
+

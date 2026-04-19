@@ -1,0 +1,36 @@
+# Copia este archivo a config.yml y ajusta valores (config.yml está en .gitignore).
+# Meter ops: MQTT subscriber (fred-ops)
+#
+# Evento esperado (ejemplo):
+# {
+#   "local_timestamptz": "2026-04-13T13:15:54.735-0500",
+#   "data": { "voltage": 125.5, "current": 0, ... }
+# }
+
+broker:
+  # Solo hostname o IP, sin esquema mqtt://
+  host: your-mqtt-broker.example.com
+  port: 1883
+  username: null
+  password: null
+  client_id: fred-ops-meter-ops
+
+mode: sub
+
+input:
+  topic: meter/+/reading
+  schema:
+    local_timestamptz: str
+    data: dict
+  # Alternativa si prefieres recibir el JSON crudo sin schema (execute recibe mqtt_topic/payload_json):
+  # generic_event_log: true
+
+kwargs: {}
+
+# UI Streamlit (opcional): pon enabled: true y abre http://localhost:8501
+dashboard:
+  enabled: false
+  port: 8501
+  host: "0.0.0.0"
+  max_rows: 2000
+
