@@ -12,8 +12,9 @@ METER_OPS_CONFIG_FILE := meter-ops/config/config.yml
 METER_OPS_CONFIG_EXAMPLE := meter-ops/config/config.yml.example
 VICTOR_IA_ENV_FILE := victor-ia/config/.env
 VICTOR_IA_ENV_EXAMPLE := victor-ia/config/.env.example
+ENERGY_SIM_PROFILE := energy-simulator
 
-.PHONY: help up up-build deploy-services down down-v build logs logs-bot logs-dth11 logs-meter-ops logs-victor-ia logs-portainer logs-postgres logs-ener-vault ps restart restart-portainer stop start pull up-portainer ops-beacon ops-beacon-victor rebuild-ops-beacon portainer-password-check postgres-config-check ener-vault-config-check meter-ops-config-check victor-ia-config-check run-dth11 run-meter-ops
+.PHONY: help up up-build deploy-services down down-v build logs logs-bot logs-dth11 logs-meter-ops logs-victor-ia logs-portainer logs-postgres logs-ener-vault ps restart restart-portainer stop start pull up-portainer ops-beacon ops-beacon-victor rebuild-ops-beacon portainer-password-check postgres-config-check ener-vault-config-check meter-ops-config-check victor-ia-config-check run-dth11 run-meter-ops energy-meter-simulator-up energy-meter-simulator-down logs-energy-meter-simulator run-energy-meter-simulator
 
 .DEFAULT_GOAL := help
 
@@ -47,7 +48,11 @@ help:
 		ops-beacon-victor     'Alias de ops-beacon (compatibilidad)' \
 		pull                  'Descargar imágenes base (si aplica)' \
 		run-dth11             'Run dth-11 processor (requires MQTT broker at localhost:1883)' \
-		run-meter-ops         'Run meter-ops (requires MQTT broker)'
+		run-meter-ops         'Run meter-ops (requires MQTT broker)' \
+		energy-meter-simulator-up "Levantar simulador MQTT (N=consecutivo): contenedor energy-meter-simulator-N" \
+		energy-meter-simulator-down "Parar y eliminar contenedor energy-meter-simulator-N (requiere N=)" \
+		logs-energy-meter-simulator "Seguir logs del contenedor energy-meter-simulator-N (requiere N=)" \
+		run-energy-meter-simulator 'Run energy-meter-simulator local (requiere config/config.yml)'
 
 up:
 	$(COMPOSE) -f $(COMPOSE_FILE) up -d
@@ -148,3 +153,19 @@ run-dth11:
 
 run-meter-ops:
 	cd meter-ops && uv run fred-ops run --config config/config.yml --script app/main.py
+
+energy-meter-simulator-up:
+	@test -n "$(N)" || (echo "Uso: make energy-meter-simulator-up N=<consecutivo>"; exit 1)
+	$(COMPOSE) -f $(COMPOSE_FILE) --profile $(ENERGY_SIM_PROFILE) build energy-meter-simulator
+	$(COMPOSE) -f $(COMPOSE_FILE) --profile $(ENERGY_SIM_PROFILE) run -d --name energy-meter-simulator-$(N) -e SIMULATOR_ID=$(N) energy-meter-simulator
+
+energy-meter-simulator-down:
+	@test -n "$(N)" || (echo "Uso: make energy-meter-simulator-down N=<consecutivo>"; exit 1)
+	docker rm -f energy-meter-simulator-$(N)
+
+logs-energy-meter-simulator:
+	@test -n "$(N)" || (echo "Uso: make logs-energy-meter-simulator N=<consecutivo>"; exit 1)
+	docker logs -f energy-meter-simulator-$(N)
+
+run-energy-meter-simulator:
+	cd energy-meter-simulator && uv run fred-ops run --config config/config.yml --script app/main.py

@@ -104,6 +104,18 @@ services:
       ener-vault:
         condition: service_healthy
 
+  energy-meter-simulator:
+    profiles:
+      - energy-simulator
+    build:
+      context: .
+      dockerfile: energy-meter-simulator/Dockerfile
+    restart: unless-stopped
+    environment:
+      SIMULATOR_ID: ${SIMULATOR_ID:-}
+    volumes:
+      - ./energy-meter-simulator/config/config.yml:/app/energy-meter-simulator/config/config.yml:ro
+
 volumes:
   portainer_data:
   postgres_data:
