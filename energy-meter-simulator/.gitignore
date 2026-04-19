@@ -1,0 +1,3 @@
+# Local broker secrets — use config.yml.example as template
+config/config.yml
+config/config.runtime.yml

@@ -1,0 +1,22 @@
+# Copia a config.yml y ajusta broker/topic (config.yml está en .gitignore).
+# Modo PUB: publica JSON periódicamente (ver interval_seconds en kwargs).
+
+broker:
+  host: your-mqtt-broker.example.com
+  port: 1883
+  username: null
+  password: null
+  # En Docker con SIMULATOR_ID, usa __SIMULATOR_ID__; en local puedes poner un id fijo (p. ej. energy-meter-simulator-dev).
+  client_id: energy-meter-simulator-__SIMULATOR_ID__
+
+mode: pub
+
+output:
+  # __SIMULATOR_ID__ se reemplaza por N al usar make energy-meter-simulator-up N=...
+  topic: /volttio/__SIMULATOR_ID__/energy-stats
+  schema:
+    local_timestamptz: str
+    data: dict
+
+kwargs:
+  interval_seconds: 60
