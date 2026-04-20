@@ -76,13 +76,20 @@ def ener_vault_create_device(
     name: str | None = None,
     serial_number: str | None = None,
     is_active: bool = True,
+    device_id: str | None = None,
 ) -> str:
     """Create a new energy meter (medidor) in ener-vault.
 
     POST /v1/devices. Use at least a descriptive name and/or serial_number; serial_number must be
-    unique. On duplicate serial, the API returns 409. Successful creation returns 201 with id, timestamps, etc.
+    unique. On duplicate serial or duplicate id, the API returns 409. Successful creation returns
+    201 with id, timestamps, etc.
+
+    Optional ``device_id``: UUID string for the meter primary key. If omitted, ener-vault assigns
+    a server-generated UUID (version 1).
     """
     body: dict[str, Any] = {"is_active": is_active}
+    if device_id is not None and device_id.strip():
+        body["id"] = device_id.strip()
     if name is not None and name.strip():
         body["name"] = name.strip()
     if serial_number is not None and serial_number.strip():

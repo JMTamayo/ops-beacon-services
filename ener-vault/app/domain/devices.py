@@ -15,11 +15,19 @@ _DEVICE_SORT_COLUMNS = {
 
 
 def create_device(db: Session, data: DeviceCreate) -> Device:
-    row = Device(
-        name=data.name,
-        serial_number=data.serial_number,
-        is_active=data.is_active,
-    )
+    if data.id is not None:
+        row = Device(
+            id=data.id,
+            name=data.name,
+            serial_number=data.serial_number,
+            is_active=data.is_active,
+        )
+    else:
+        row = Device(
+            name=data.name,
+            serial_number=data.serial_number,
+            is_active=data.is_active,
+        )
     db.add(row)
     try:
         db.commit()

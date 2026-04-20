@@ -5,6 +5,10 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class DeviceCreate(BaseModel):
+    id: uuid.UUID | None = Field(
+        default=None,
+        description="Optional primary key. If omitted, the server assigns a UUID v1.",
+    )
     name: str | None = Field(default=None, max_length=255)
     serial_number: str | None = Field(default=None, max_length=128)
     is_active: bool = True
